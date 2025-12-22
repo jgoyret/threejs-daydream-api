@@ -62,15 +62,45 @@ Enter it in the input field at the bottom when the app loads.
 
 ## Stream Status Polling
 
-After connecting, poll the status endpoint to know when video is ready:
+After creating a stream, you need to poll its status to know when the video is ready.
 
-endpoint: https://api.daydream.live/v1/streams/STREAM_ID/status
+### 1. Get the Stream ID
+
+When you create a stream, the API returns an object with the stream ID:
 
 ```javascript
-const statusData = await getStreamStatus(apiKey, streamId);
-const state = statusData?.data?.state;
-const whepUrl = statusData?.data?.gateway_status?.whep_url;
+const stream = await createStream(apiKey, params);
+const streamId = stream.id;  // e.g. "str_9UQrn8an2tWzfWm"
 ```
+
+### 2. Poll the Status Endpoint
+
+```
+GET https://api.daydream.live/v1/streams/{STREAM_ID}/status
+Authorization: Bearer {API_KEY}
+```
+
+Example: `https://api.daydream.live/v1/streams/str_9UQrn8an2tWzfWm/status`
+
+### 3. Check the Response
+
+The status response has this structure:
+
+```javascript
+{
+  "success": true,
+  "data": {
+    "state": "ONLINE",                    // <-- Pipeline state
+    "gateway_status": {
+      "whep_url": "https://..../whep"     // <-- URL to receive video
+    }
+  }
+}
+```
+
+Key fields:
+- **`data.state`** - Pipeline state (`LOADING`, `ONLINE`, etc.)
+- **`data.gateway_status.whep_url`** - URL to connect and receive the AI-processed video
 
 ### Pipeline States
 
@@ -81,9 +111,13 @@ const whepUrl = statusData?.data?.gateway_status?.whep_url;
 
 ### Wait for Ready State
 
-The `whep_url` appears before video is actually ready. Always check the `state`:
+The `whep_url` appears before video is actually ready. Always check `state`:
 
 ```javascript
+const statusData = await getStreamStatus(apiKey, streamId);
+const state = statusData?.data?.state;
+const whepUrl = statusData?.data?.gateway_status?.whep_url;
+
 // Stream is ready when state is ONLINE
 const isReady = state === 'ONLINE' && whepUrl;
 ```
