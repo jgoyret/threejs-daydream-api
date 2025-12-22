@@ -1,26 +1,28 @@
 import axios from "axios";
 
 const API_BASE_URL = "https://api.daydream.live/v1";
-const API_KEY = import.meta.env.VITE_DAYDREAM_API_KEY;
 
-if (!API_KEY) {
-  console.error("VITE_DAYDREAM_API_KEY not found in environment variables");
+/**
+ * Create an axios client with the provided API key
+ */
+function createApiClient(apiKey) {
+  return axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+  });
 }
-
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    Authorization: `Bearer ${API_KEY}`,
-    "Content-Type": "application/json",
-  },
-});
 
 /**
  * Create a new Daydream stream
+ * @param {string} apiKey - Daydream API key
  * @param {Object} params - Stream parameters (prompt, delta, num_inference_steps, etc)
  * @returns {Promise<Object>} Stream data including whip_url and output_stream_url
  */
-export async function createStream(params = {}) {
+export async function createStream(apiKey, params = {}) {
+  const apiClient = createApiClient(apiKey);
   const numSteps = params.num_inference_steps || 50;
 
   const config = {
@@ -64,11 +66,13 @@ export async function createStream(params = {}) {
 
 /**
  * Update stream parameters dynamically
+ * @param {string} apiKey - Daydream API key
  * @param {string} streamId - Stream ID
  * @param {Object} params - Parameters to update (prompt, delta, num_inference_steps, etc)
  * @returns {Promise<Object>} Updated stream data
  */
-export async function updateStream(streamId, params) {
+export async function updateStream(apiKey, streamId, params) {
+  const apiClient = createApiClient(apiKey);
   const numSteps = params.num_inference_steps || 50;
 
   const payload = {
@@ -90,19 +94,23 @@ export async function updateStream(streamId, params) {
 
 /**
  * Get stream status
+ * @param {string} apiKey - Daydream API key
  * @param {string} streamId - Stream ID
  * @returns {Promise<Object>} Stream status
  */
-export async function getStreamStatus(streamId) {
+export async function getStreamStatus(apiKey, streamId) {
+  const apiClient = createApiClient(apiKey);
   const response = await apiClient.get(`/streams/${streamId}/status`);
   return response.data;
 }
 
 /**
  * Delete a stream
+ * @param {string} apiKey - Daydream API key
  * @param {string} streamId - Stream ID
  * @returns {Promise<void>}
  */
-export async function deleteStream(streamId) {
+export async function deleteStream(apiKey, streamId) {
+  const apiClient = createApiClient(apiKey);
   await apiClient.delete(`/streams/${streamId}`);
 }

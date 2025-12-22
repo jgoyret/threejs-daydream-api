@@ -130,9 +130,85 @@ Displays the AI-processed stream:
 
 ### daydreamAPI.js
 REST API client for Daydream:
-- `createStream(params)` - Create new stream session
-- `updateStream(id, params)` - Update prompt/settings live
-- `getStreamStatus(id)` - Poll for WHEP URL and status
+- `createStream(apiKey, params)` - Create new stream session
+- `updateStream(apiKey, id, params)` - Update prompt/settings live
+- `getStreamStatus(apiKey, id)` - Poll for stream status and WHEP URL
+
+## Stream Status Polling
+
+After creating a stream and connecting via WHIP, you need to poll the status endpoint to know when the stream is ready. The pipeline goes through several states:
+
+### Pipeline States
+
+| State | Description |
+|-------|-------------|
+| `LOADING` | Pipeline is initializing the AI model. Show a loading indicator. |
+| `ONLINE` | Pipeline is ready and streaming. Video should be visible. |
+| `DEGRADED_INFERENCE` | Pipeline is running with some performance limitations. Video is visible. |
+
+### How to Check if Stream is Ready
+
+```javascript
+// Poll the status endpoint
+const statusData = await getStreamStatus(apiKey, streamId);
+
+// Get the pipeline state
+const pipelineState = statusData?.data?.state;
+
+// Check if ready (any of these means video is available)
+const isReady = ['ONLINE', 'DEGRADED_INFERENCE', 'INFERENCE', 'RUNNING'].includes(pipelineState);
+
+// Get WHEP URL for playback
+const whepUrl = statusData?.data?.gateway_status?.whep_url;
+```
+
+### Status Response Structure
+
+```json
+{
+  "success": true,
+  "data": {
+    "state": "DEGRADED_INFERENCE",
+    "gateway_status": {
+      "whep_url": "https://..../whep",
+      "ingest_metrics": {
+        "stats": {
+          "track_stats": [
+            { "type": "video", "packets_received": 4905 }
+          ],
+          "conn_quality": "good"
+        }
+      }
+    },
+    "inference_status": {
+      "fps": 0,
+      "last_error": null,
+      "last_params": { ... }
+    },
+    "input_status": {
+      "fps": 23.98,
+      "last_input_time": 1766413112878
+    }
+  }
+}
+```
+
+### Important: Wait for Video Data
+
+The `whep_url` appears before the video is actually ready. To ensure the stream is truly ready:
+
+1. **Check `state`**: Wait until it's `ONLINE` or `DEGRADED_INFERENCE`
+2. **Verify `ingest_metrics`**: Presence of `track_stats` with `type: "video"` confirms video data is flowing
+
+```javascript
+// Full readiness check
+const isVideoReady =
+  whepUrl &&
+  (pipelineState === 'ONLINE' || pipelineState === 'DEGRADED_INFERENCE') &&
+  statusData?.data?.gateway_status?.ingest_metrics?.stats?.track_stats?.some(
+    track => track.type === 'video'
+  );
+```
 
 ## Setup
 
@@ -141,18 +217,18 @@ REST API client for Daydream:
 npm install
 ```
 
-### 2. Configure API Key
-Create a `.env` file:
-```env
-VITE_DAYDREAM_API_KEY=your_api_key_here
-```
-
+### 2. Get your API Key
 Get your API key from [daydream.live](https://daydream.live)
+
+API keys start with `sk_` (e.g., `sk_eCqYRZhQ...`)
 
 ### 3. Run development server
 ```bash
 npm run dev
 ```
+
+### 4. Enter API Key
+When the app loads, enter your Daydream API key in the input field at the bottom of the screen. The key is validated client-side (must start with `sk_`) and is never stored - you'll need to enter it each session.
 
 ## Usage
 
@@ -211,12 +287,14 @@ The stream is created with these default parameters:
 
 ### App.jsx - The Orchestrator
 ```jsx
-// 1. Reference to the Three.js canvas
+// 1. State for API key (entered by user) and canvas reference
+const [apiKey, setApiKey] = useState(null);
 const canvasRef = useRef(null);
 
-// 2. Initialize DaydreamManager with canvas reference
-const { startStreaming, stopStreaming, isStreaming } = DaydreamManager({
+// 2. Initialize DaydreamManager with canvas reference and API key
+const { startStreaming, stopStreaming, isStreaming, status, pipelineState } = DaydreamManager({
   canvasRef,
+  apiKey,
   onStreamReady: (whepUrl) => setOutputStreamUrl(whepUrl),
   onError: (error) => console.error(error)
 });
@@ -227,21 +305,52 @@ return (
     {/* Layer 0: Background */}
     <AnimatedBackground />
 
-    {/* Layer 1: Three.js Canvas (hidden, but captured) */}
+    {/* Layer 1: Three.js Canvas (hidden, but captured for streaming) */}
     <Canvas onCreated={() => canvasRef.current = document.querySelector('canvas')}>
       <Experience />
     </Canvas>
 
-    {/* Layer 2: AI-processed video (visible) */}
+    {/* Layer 2: AI-processed video overlay + loading spinner */}
     <DaydreamVideoOverlay
       outputStreamUrl={outputStreamUrl}
       isStreaming={isStreaming}
+      status={status}           // 'idle' | 'connecting' | 'loading' | 'streaming' | 'error'
+      pipelineState={pipelineState}  // 'LOADING' | 'ONLINE' | 'DEGRADED_INFERENCE' | etc.
     />
 
-    {/* Layer 3: UI Controls */}
-    <DaydreamControls onStart={startStreaming} onStop={stopStreaming} />
+    {/* Layer 3: UI Controls (API key input → Prompt input → Stream controls) */}
+    <DaydreamControls
+      onStart={startStreaming}
+      onStop={stopStreaming}
+      apiKey={apiKey}
+      onApiKeyChange={setApiKey}
+    />
   </>
 );
+```
+
+### DaydreamManager - Status Flow
+```
+User clicks "Start Stream"
+         │
+         ▼
+   status: 'connecting'     ← Spinner: "Starting stream..."
+         │
+         ▼
+   Create stream via API
+   Connect via WHIP
+         │
+         ▼
+   Poll /streams/{id}/status
+         │
+         ├─► state: 'LOADING'
+         │   status: 'loading'  ← Spinner: "Loading pipeline..."
+         │
+         ├─► state: 'ONLINE' or 'DEGRADED_INFERENCE'
+         │   status: 'streaming' ← Spinner disappears, video plays
+         │
+         └─► Error
+             status: 'error'
 ```
 
 ## License

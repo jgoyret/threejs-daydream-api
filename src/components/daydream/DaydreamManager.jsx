@@ -5,13 +5,20 @@ import { createStream, updateStream } from '../../services/daydreamAPI';
  * DaydreamManager - Manages WebRTC streaming to/from Daydream API
  * Captures canvas, sends via WHIP, and receives processed stream
  */
-export default function DaydreamManager({ canvasRef, onStreamReady, onError }) {
+export default function DaydreamManager({ canvasRef, onStreamReady, onError, apiKey }) {
   const [streamData, setStreamData] = useState(null);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [status, setStatus] = useState('idle'); // idle, connecting, streaming, error
+  const [status, setStatus] = useState('idle'); // idle, connecting, loading, streaming, error
+  const [pipelineState, setPipelineState] = useState(null); // LOADING, DEGRADED_INFERENCE, etc.
   const peerConnectionRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const statusIntervalRef = useRef(null);
+  const apiKeyRef = useRef(apiKey);
+
+  // Keep apiKey ref updated
+  useEffect(() => {
+    apiKeyRef.current = apiKey;
+  }, [apiKey]);
 
   /**
    * Start streaming: Create stream session and send canvas via WebRTC
@@ -22,7 +29,7 @@ export default function DaydreamManager({ canvasRef, onStreamReady, onError }) {
 
       // 1. Create stream on Daydream
       console.log('Creating Daydream stream with params:', params);
-      const stream = await createStream(params);
+      const stream = await createStream(apiKeyRef.current, params);
 
       setStreamData(stream);
       console.log('Stream created:', stream);
@@ -93,41 +100,64 @@ export default function DaydreamManager({ canvasRef, onStreamReady, onError }) {
       });
 
       setIsStreaming(true);
-      setStatus('streaming');
+      // Keep status as 'connecting' until pipeline is ready
 
-      // Wait for WHEP URL to be available in gateway status
+      // Wait for pipeline to be ready (state: DEGRADED_INFERENCE or similar)
       if (onStreamReady && stream.id) {
-        console.log('🔍 Waiting for WHEP URL from gateway status:', stream.id);
+        console.log('🔍 Waiting for pipeline to be ready:', stream.id);
 
         try {
           let attempts = 0;
-          const maxAttempts = 20; // 20 seconds max
+          const maxAttempts = 120; // 120 seconds max (pipeline loading can take a while)
+          let pipelineReady = false;
           let whepUrl = null;
 
-          while (attempts < maxAttempts && !whepUrl) {
+          while (attempts < maxAttempts && !pipelineReady) {
             const { getStreamStatus } = await import('../../services/daydreamAPI');
-            const statusData = await getStreamStatus(stream.id);
+            const statusData = await getStreamStatus(apiKeyRef.current, stream.id);
 
-            console.log(`📊 Attempt ${attempts + 1}: Checking gateway status...`);
+            console.log(`📊 Attempt ${attempts + 1}: Checking pipeline state...`);
 
-            const gatewayWhepUrl = statusData?.data?.gateway_status?.whep_url;
+            const gatewayStatus = statusData?.data?.gateway_status;
+            const currentState = statusData?.data?.state;
+            whepUrl = gatewayStatus?.whep_url;
 
-            if (gatewayWhepUrl) {
-              whepUrl = gatewayWhepUrl;
-              console.log('✅ WHEP URL found:', whepUrl);
-              onStreamReady(whepUrl);
+            // Update pipeline state for UI
+            if (currentState) {
+              setPipelineState(currentState);
+              console.log(`📊 Pipeline state: ${currentState}`);
+            }
+
+            // Update status based on pipeline state
+            if (currentState === 'LOADING') {
+              setStatus('loading');
+              console.log('⏳ Pipeline is loading...');
+            }
+
+            // Check if pipeline is ready (DEGRADED_INFERENCE or ONLINE means it's running)
+            if (currentState === 'DEGRADED_INFERENCE' || currentState === 'ONLINE' || currentState === 'INFERENCE' || currentState === 'RUNNING') {
+              pipelineReady = true;
+              console.log('✅ Pipeline ready! State:', currentState);
+              setStatus('streaming');
+              if (whepUrl) {
+                onStreamReady(whepUrl);
+              }
               break;
             }
 
             // Wait 1 second before next attempt
             attempts++;
-            if (!whepUrl) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
 
-          if (!whepUrl) {
-            console.error('❌ WHEP URL not available after 20 seconds');
+          if (!pipelineReady) {
+            console.error('❌ Pipeline not ready after 120 seconds');
+            // Still provide WHEP URL if available, user can try
+            if (whepUrl) {
+              console.log('⚠️ Providing WHEP URL anyway:', whepUrl);
+              setStatus('streaming');
+              onStreamReady(whepUrl);
+            }
           }
         } catch (error) {
           console.error('❌ Error fetching stream status:', error);
@@ -155,7 +185,7 @@ export default function DaydreamManager({ canvasRef, onStreamReady, onError }) {
     const pollStatus = async () => {
       try {
         const { getStreamStatus } = await import('../../services/daydreamAPI');
-        const statusData = await getStreamStatus(streamId);
+        const statusData = await getStreamStatus(apiKeyRef.current, streamId);
 
         console.log('📊 Stream Status Update:', {
           state: statusData?.data?.state,
@@ -211,6 +241,7 @@ export default function DaydreamManager({ canvasRef, onStreamReady, onError }) {
       setStreamData(null);
       setIsStreaming(false);
       setStatus('idle');
+      setPipelineState(null);
 
     } catch (error) {
       console.error('Error stopping stream:', error);
@@ -230,7 +261,7 @@ export default function DaydreamManager({ canvasRef, onStreamReady, onError }) {
       console.log('🔄 Updating stream params:', params);
       console.log('📝 Stream ID:', streamData.id);
 
-      const updated = await updateStream(streamData.id, params);
+      const updated = await updateStream(apiKeyRef.current, streamData.id, params);
 
       console.log('✅ Update response:', updated);
       setStreamData(updated);
@@ -239,7 +270,7 @@ export default function DaydreamManager({ canvasRef, onStreamReady, onError }) {
       setTimeout(async () => {
         try {
           const { getStreamStatus } = await import('../../services/daydreamAPI');
-          const statusData = await getStreamStatus(streamData.id);
+          const statusData = await getStreamStatus(apiKeyRef.current, streamData.id);
 
           console.log('📊 Status after update:', {
             state: statusData?.data?.state,
@@ -281,6 +312,7 @@ export default function DaydreamManager({ canvasRef, onStreamReady, onError }) {
     updateParams,
     isStreaming,
     status,
+    pipelineState,
     streamData
   };
 }

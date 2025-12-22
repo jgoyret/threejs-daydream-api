@@ -5,7 +5,7 @@ import { WebRTCPlayer } from '@eyevinn/webrtc-player';
  * DaydreamVideoOverlay - Displays the AI-processed video stream
  * This is the actual canvas the player sees and interacts with
  */
-export default function DaydreamVideoOverlay({ outputStreamUrl, isStreaming }) {
+export default function DaydreamVideoOverlay({ outputStreamUrl, isStreaming, status, pipelineState }) {
   const videoWebRTCRef = useRef(null);
   const playerRef = useRef(null);
 
@@ -71,6 +71,57 @@ export default function DaydreamVideoOverlay({ outputStreamUrl, isStreaming }) {
       }
     };
   }, [outputStreamUrl, isStreaming]);
+
+  // Show loading spinner while connecting or loading pipeline
+  if (status === 'connecting' || status === 'loading') {
+    // Determine message based on status and pipeline state
+    let mainMessage = 'Starting stream...';
+    let subMessage = 'Connecting to Daydream AI';
+
+    if (status === 'loading' || pipelineState === 'LOADING') {
+      mainMessage = 'Loading pipeline...';
+      subMessage = 'Initializing AI model';
+    } else if (pipelineState) {
+      subMessage = `Status: ${pipelineState}`;
+    }
+
+    return (
+      <div
+        className="fixed inset-0 flex items-center justify-center pointer-events-none"
+        style={{ zIndex: 40 }}
+      >
+        <div
+          style={{
+            width: '1920px',
+            height: '1080px',
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            borderRadius: '8px',
+            boxShadow: '0 0 100px rgba(0, 0, 0, 0.8)'
+          }}
+        >
+          <div className="flex flex-col items-center gap-6">
+            {/* Spinner */}
+            <div className="relative">
+              <div
+                className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin"
+              />
+            </div>
+            {/* Message */}
+            <div className="text-white text-xl font-medium">
+              {mainMessage}
+            </div>
+            <div className="text-white/60 text-sm">
+              {subMessage}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isStreaming || !outputStreamUrl) {
     return null;

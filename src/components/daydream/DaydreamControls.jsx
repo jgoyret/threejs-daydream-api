@@ -1,6 +1,14 @@
 import { useState } from "react";
 
 /**
+ * Validates if the API key has the correct format
+ * Daydream API keys start with "sk_"
+ */
+function isValidApiKey(key) {
+  return key && key.startsWith("sk_") && key.length > 10;
+}
+
+/**
  * DaydreamControls - UI panel for controlling Daydream streaming
  * This is just the control panel, not the video display
  */
@@ -10,12 +18,30 @@ export default function DaydreamControls({
   onParamsChange,
   isStreaming,
   status,
+  apiKey,
+  onApiKeyChange,
 }) {
   const [prompt, setPrompt] = useState(
     "Rotten vegetables, mechanisms of clocks. Dreamlike environment."
   );
   const [numInferenceSteps, setNumInferenceSteps] = useState(50);
   const [useVideoTest, setUseVideoTest] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [apiKeyError, setApiKeyError] = useState("");
+
+  const handleApiKeySubmit = (e) => {
+    e.preventDefault();
+    if (!apiKeyInput.trim()) {
+      setApiKeyError("Please enter an API key");
+      return;
+    }
+    if (!isValidApiKey(apiKeyInput.trim())) {
+      setApiKeyError("Invalid API key format. It should start with 'sk_'");
+      return;
+    }
+    setApiKeyError("");
+    onApiKeyChange(apiKeyInput.trim());
+  };
 
   const handleStart = () => {
     onStart({
@@ -47,6 +73,63 @@ export default function DaydreamControls({
     streaming: "Live",
     error: "Error",
   };
+
+  // API Key input screen - shown when no valid API key is set
+  if (!apiKey) {
+    return (
+      <div
+        data-daydream-ui
+        className="fixed bottom-0 left-0 right-0 bg-black/90 text-white p-4 border-t border-gray-700"
+        style={{ zIndex: 200, pointerEvents: "auto" }}
+      >
+        <div className="max-w-6xl mx-auto">
+          <form onSubmit={handleApiKeySubmit} className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3">
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <span className="text-sm font-semibold">API Key Required</span>
+            </div>
+
+            <input
+              type="password"
+              value={apiKeyInput}
+              onChange={(e) => {
+                setApiKeyInput(e.target.value);
+                setApiKeyError("");
+              }}
+              className={`flex-1 bg-gray-800 text-white px-4 py-2 rounded-full text-sm focus:outline-none focus:ring-2 ${
+                apiKeyError ? "ring-2 ring-red-500" : "focus:ring-blue-500"
+              }`}
+              placeholder="Enter your Daydream API key (sk_...)"
+              autoComplete="off"
+            />
+
+            <button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-full font-semibold transition text-sm whitespace-nowrap"
+            >
+              Connect
+            </button>
+          </form>
+
+          {apiKeyError && (
+            <p className="text-red-400 text-xs mt-2 ml-4">{apiKeyError}</p>
+          )}
+
+          <p className="text-gray-500 text-xs mt-2 ml-4">
+            Get your API key at{" "}
+            <a
+              href="https://daydream.live"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:underline"
+            >
+              daydream.live
+            </a>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Bottom layout when NOT streaming
   if (!isStreaming) {

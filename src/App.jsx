@@ -12,11 +12,13 @@ import DaydreamVideoOverlay from "./components/daydream/DaydreamVideoOverlay";
 export default function App() {
   const canvasRef = useRef(null);
   const [outputStreamUrl, setOutputStreamUrl] = useState(null);
+  const [apiKey, setApiKey] = useState(null);
 
   // Initialize Daydream manager
-  const { startStreaming, stopStreaming, updateParams, isStreaming, status } =
+  const { startStreaming, stopStreaming, updateParams, isStreaming, status, pipelineState } =
     DaydreamManager({
       canvasRef,
+      apiKey,
       onStreamReady: (data) => {
         console.log("Stream ready:", data);
         if (typeof data === "object") {
@@ -75,6 +77,8 @@ export default function App() {
       <DaydreamVideoOverlay
         outputStreamUrl={outputStreamUrl}
         isStreaming={isStreaming}
+        status={status}
+        pipelineState={pipelineState}
       />
 
       {/* Layer 3: UI (z-index: 150+) - Always visible on top */}
@@ -87,6 +91,8 @@ export default function App() {
         onParamsChange={updateParams}
         isStreaming={isStreaming}
         status={status}
+        apiKey={apiKey}
+        onApiKeyChange={setApiKey}
       />
     </>
   );

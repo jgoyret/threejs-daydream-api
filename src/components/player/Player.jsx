@@ -26,6 +26,9 @@ const Player = forwardRef(function Player({ speed = 4, spawn = null }, ref) {
         document.body.classList.add('pointer-locked');
       } else {
         document.body.classList.remove('pointer-locked');
+        // Limpiar estado de teclas al desbloquear el pointer
+        // para evitar que queden "pegadas"
+        keys.current = {};
       }
     };
     document.addEventListener('pointerlockchange', onPointerLockChange);
@@ -41,6 +44,9 @@ const Player = forwardRef(function Player({ speed = 4, spawn = null }, ref) {
     window.addEventListener("keyup", onKeyUp);
 
     function onMouseMove(e) {
+      // Solo procesar movimiento del mouse si el pointer está bloqueado
+      if (!document.pointerLockElement) return;
+
       const mx = e.movementX || 0;
       const my = e.movementY || 0;
       yaw.current -= mx * 0.0025;
@@ -78,30 +84,38 @@ const Player = forwardRef(function Player({ speed = 4, spawn = null }, ref) {
   useFrame((_, delta) => {
     if (!rbRef.current) return;
 
-    const inputX =
-      (keys.current["KeyD"] || keys.current["ArrowRight"] ? 1 : 0) +
-      (keys.current["KeyA"] || keys.current["ArrowLeft"] ? -1 : 0);
-    const inputZ =
-      (keys.current["KeyW"] || keys.current["ArrowUp"] ? 1 : 0) +
-      (keys.current["KeyS"] || keys.current["ArrowDown"] ? -1 : 0);
-    const isSprinting = keys.current["ShiftLeft"] || keys.current["ShiftRight"];
-    const runSpeed = speed * (isSprinting ? 2 : 1);
+    // Solo procesar controles si el pointer está bloqueado
+    const isControlActive = !!document.pointerLockElement;
 
-    const sinY = Math.sin(yaw.current);
-    const cosY = Math.cos(yaw.current);
-    const forward = { x: -sinY, z: -cosY };
-    const right = { x: cosY, z: -sinY };
+    let vx = 0;
+    let vz = 0;
 
-    const vx = (forward.x * inputZ + right.x * inputX) * runSpeed;
-    const vz = (forward.z * inputZ + right.z * inputX) * runSpeed;
+    if (isControlActive) {
+      const inputX =
+        (keys.current["KeyD"] || keys.current["ArrowRight"] ? 1 : 0) +
+        (keys.current["KeyA"] || keys.current["ArrowLeft"] ? -1 : 0);
+      const inputZ =
+        (keys.current["KeyW"] || keys.current["ArrowUp"] ? 1 : 0) +
+        (keys.current["KeyS"] || keys.current["ArrowDown"] ? -1 : 0);
+      const isSprinting = keys.current["ShiftLeft"] || keys.current["ShiftRight"];
+      const runSpeed = speed * (isSprinting ? 2 : 1);
+
+      const sinY = Math.sin(yaw.current);
+      const cosY = Math.cos(yaw.current);
+      const forward = { x: -sinY, z: -cosY };
+      const right = { x: cosY, z: -sinY };
+
+      vx = (forward.x * inputZ + right.x * inputX) * runSpeed;
+      vz = (forward.z * inputZ + right.z * inputX) * runSpeed;
+    }
 
     // Obtener velocidad actual del RigidBody
     const currentVel = rbRef.current.linvel();
 
-    // Salto
+    // Salto (solo si controles activos)
     const isGrounded = Math.abs(currentVel.y) < 0.5;
     let newVelY = currentVel.y;
-    if (keys.current["Space"] && isGrounded) {
+    if (isControlActive && keys.current["Space"] && isGrounded) {
       newVelY = 7;
     }
 
