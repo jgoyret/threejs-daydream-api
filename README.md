@@ -144,7 +144,6 @@ After creating a stream and connecting via WHIP, you need to poll the status end
 |-------|-------------|
 | `LOADING` | Pipeline is initializing the AI model. Show a loading indicator. |
 | `ONLINE` | Pipeline is ready and streaming. Video should be visible. |
-| `DEGRADED_INFERENCE` | Pipeline is running with some performance limitations. Video is visible. |
 
 ### How to Check if Stream is Ready
 
@@ -168,7 +167,7 @@ const whepUrl = statusData?.data?.gateway_status?.whep_url;
 {
   "success": true,
   "data": {
-    "state": "DEGRADED_INFERENCE",
+    "state": "ONLINE",
     "gateway_status": {
       "whep_url": "https://..../whep",
       "ingest_metrics": {
@@ -197,14 +196,14 @@ const whepUrl = statusData?.data?.gateway_status?.whep_url;
 
 The `whep_url` appears before the video is actually ready. To ensure the stream is truly ready:
 
-1. **Check `state`**: Wait until it's `ONLINE` or `DEGRADED_INFERENCE`
+1. **Check `state`**: Wait until it's `ONLINE`
 2. **Verify `ingest_metrics`**: Presence of `track_stats` with `type: "video"` confirms video data is flowing
 
 ```javascript
 // Full readiness check
 const isVideoReady =
   whepUrl &&
-  (pipelineState === 'ONLINE' || pipelineState === 'DEGRADED_INFERENCE') &&
+  (pipelineState === 'ONLINE') &&
   statusData?.data?.gateway_status?.ingest_metrics?.stats?.track_stats?.some(
     track => track.type === 'video'
   );
@@ -277,7 +276,6 @@ The stream is created with these default parameters:
 
 - **React 19** - UI framework
 - **Three.js** + **React Three Fiber** - 3D rendering
-- **@react-three/rapier** - Physics simulation
 - **WebRTC** - Real-time streaming
 - **@eyevinn/webrtc-player** - WHEP playback
 - **Vite** - Build tool
@@ -346,13 +344,11 @@ User clicks "Start Stream"
          ├─► state: 'LOADING'
          │   status: 'loading'  ← Spinner: "Loading pipeline..."
          │
-         ├─► state: 'ONLINE' or 'DEGRADED_INFERENCE'
+         ├─► state: 'ONLINE'
          │   status: 'streaming' ← Spinner disappears, video plays
          │
          └─► Error
              status: 'error'
 ```
 
-## License
 
-MIT
