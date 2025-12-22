@@ -12,7 +12,7 @@ export default function DaydreamControls({
   status,
 }) {
   const [prompt, setPrompt] = useState(
-    "plaza indepencia de montevideo uruguay, pepe mujica, tambores, candombe, artigas, monumento artigas, vibrant colors, dreamlike atmosphere, magical lighting, detailed environment"
+    "Rotten vegetables, mechanisms of clocks. Dreamlike environment."
   );
   const [numInferenceSteps, setNumInferenceSteps] = useState(50);
   const [useVideoTest, setUseVideoTest] = useState(false);

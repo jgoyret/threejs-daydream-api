@@ -2,7 +2,6 @@ import "./App.css";
 import { useState, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import Experience from "./components/Experience";
-import HUD from "./components/HUD";
 import ControlsInfo from "./components/ui/ControlsInfo";
 import UsageInfo from "./components/ui/UsageInfo";
 import AnimatedBackground from "./components/ui/AnimatedBackground";
@@ -79,8 +78,6 @@ export default function App() {
       />
 
       {/* Layer 3: UI (z-index: 150+) - Always visible on top */}
-      {/* <HUD avatar="/avatar.png" /> */}
-
       <ControlsInfo />
       <UsageInfo />
 
