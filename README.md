@@ -41,7 +41,7 @@ npm run dev
 ```
 
 ### 2. Enter API Key
-Get your API key from [daydream.live](https://daydream.live) (starts with `sk_`)
+Get your API key from [daydream.live](https://daydream.live)
 
 Enter it in the input field at the bottom when the app loads.
 
@@ -63,6 +63,8 @@ Enter it in the input field at the bottom when the app loads.
 ## Stream Status Polling
 
 After connecting, poll the status endpoint to know when video is ready:
+
+endpoint: https://api.daydream.live/v1/streams/STREAM_ID/status
 
 ```javascript
 const statusData = await getStreamStatus(apiKey, streamId);
