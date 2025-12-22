@@ -32,18 +32,6 @@ A demonstration of real-time 3D scene streaming with AI-powered visual transform
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### The Layer System
-
-The app uses a layered architecture where the Three.js canvas is **hidden but active**, while the AI-processed video is displayed on top:
-
-| Layer | Z-Index | Component | Visibility |
-|-------|---------|-----------|------------|
-| 0 | 0 | AnimatedBackground | Visible (gradient) |
-| 1 | 1 | Three.js Canvas | **Hidden** (but rendering) |
-| 2 | 40 | Video Overlay | **Visible** (AI output) |
-| 3 | 200 | UI Controls | Visible |
-
-This allows the 3D scene to be captured and streamed while the user sees only the AI-transformed result.
 
 ## WebRTC Streaming Flow
 
