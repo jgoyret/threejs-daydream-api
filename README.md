@@ -8,26 +8,26 @@ A demonstration of real-time 3D scene streaming with AI-powered visual transform
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              BROWSER                                        │
 │                                                                             │
-│  ┌──────────────┐    captureStream()    ┌──────────────────┐               │
-│  │  Three.js    │ ──────────────────►   │  WebRTC          │               │
-│  │  Canvas      │        30 FPS         │  PeerConnection  │               │
-│  │  (hidden)    │                       │                  │               │
-│  └──────────────┘                       └────────┬─────────┘               │
+│  ┌──────────────┐    captureStream()    ┌──────────────────┐                │
+│  │  Three.js    │ ──────────────────►   │  WebRTC          │                │
+│  │  Canvas      │        30 FPS         │  PeerConnection  │                │
+│  │  (hidden)    │                       │                  │                │
+│  └──────────────┘                       └────────┬─────────┘                │
 │                                                  │                          │
 │                                                  │ WHIP (send)              │
 │                                                  ▼                          │
-│                                         ┌──────────────────┐               │
-│                                         │  Daydream API    │               │
-│                                         │  (AI Processing) │               │
-│                                         └────────┬─────────┘               │
+│                                         ┌──────────────────┐                │
+│                                         │  Daydream API    │                │
+│                                         │  (AI Processing) │                │
+│                                         └────────┬─────────┘                │
 │                                                  │                          │
 │                                                  │ WHEP (receive)           │
 │                                                  ▼                          │
-│  ┌──────────────┐                       ┌──────────────────┐               │
-│  │  Video       │ ◄──────────────────── │  WebRTC Player   │               │
-│  │  Overlay     │    AI-transformed     │  (@eyevinn)      │               │
-│  │  (visible)   │       stream          │                  │               │
-│  └──────────────┘                       └──────────────────┘               │
+│  ┌──────────────┐                       ┌──────────────────┐                │
+│  │  Video       │ ◄──────────────────── │  WebRTC Player   │                │
+│  │  Overlay     │    AI-transformed     │  (@eyevinn)      │                │
+│  │  (visible)   │       stream          │                  │                │
+│  └──────────────┘                       └──────────────────┘                │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
