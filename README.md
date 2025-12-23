@@ -66,14 +66,51 @@ After creating a stream, you need to poll its status to know when the video is r
 
 ### 1. Get the Stream ID
 
-When you create a stream, the API returns an object with the stream ID:
+When you create a stream, the API returns the stream ID:
 
 ```javascript
+// Using the project's helper function (src/services/daydreamAPI.js)
 const stream = await createStream(apiKey, params);
 const streamId = stream.id;  // e.g. "str_9UQrn8an2tWzfWm"
 ```
 
+Internally, `createStream()` makes this API call:
+
+```javascript
+// Direct API call
+POST https://api.daydream.live/v1/streams
+Authorization: Bearer {API_KEY}
+Content-Type: application/json
+
+{
+  "pipeline": "streamdiffusion",
+  "params": {
+    "model_id": "stabilityai/sdxl-turbo",
+    "prompt": "your prompt here",
+    "width": 1024,
+    "height": 576,
+    ...
+  }
+}
+
+// Response
+{
+  "id": "str_9UQrn8an2tWzfWm",
+  "whip_url": "https://..../whip",
+  "output_stream_url": "https://..."
+}
+```
+
 ### 2. Poll the Status Endpoint
+
+```javascript
+// Using the project's helper function (src/services/daydreamAPI.js)
+const statusData = await getStreamStatus(apiKey, streamId);
+const state = statusData?.data?.state;
+const whepUrl = statusData?.data?.gateway_status?.whep_url;
+```
+
+Internally, `getStreamStatus()` makes this API call:
 
 ```
 GET https://api.daydream.live/v1/streams/{STREAM_ID}/status
@@ -82,17 +119,15 @@ Authorization: Bearer {API_KEY}
 
 Example: `https://api.daydream.live/v1/streams/str_9UQrn8an2tWzfWm/status`
 
-### 3. Check the Response
+### 3. Response Structure
 
-The status response has this structure:
-
-```javascript
+```json
 {
   "success": true,
   "data": {
-    "state": "ONLINE",                    // <-- Pipeline state
+    "state": "ONLINE",                    // ← Pipeline state
     "gateway_status": {
-      "whep_url": "https://..../whep"     // <-- URL to receive video
+      "whep_url": "https://..../whep"     // ← URL to receive video
     }
   }
 }
@@ -114,11 +149,7 @@ Key fields:
 The `whep_url` appears before video is actually ready. Always check `state`:
 
 ```javascript
-const statusData = await getStreamStatus(apiKey, streamId);
-const state = statusData?.data?.state;
-const whepUrl = statusData?.data?.gateway_status?.whep_url;
-
-// Stream is ready when state is ONLINE
+// Poll until ready
 const isReady = state === 'ONLINE' && whepUrl;
 ```
 
@@ -190,6 +221,38 @@ src/
 ### WebRTC Flow
 
 **1. Capture & Send (WHIP)**
+
+First, create a stream to get the `whip_url`:
+
+```javascript
+// Using the project's helper function (src/services/daydreamAPI.js)
+const stream = await createStream(apiKey, { prompt: 'your prompt' });
+const whipUrl = stream.whip_url;
+```
+
+Internally, `createStream()` makes this API call:
+
+```
+POST https://api.daydream.live/v1/streams
+Authorization: Bearer {API_KEY}
+Content-Type: application/json
+
+{
+  "pipeline": "streamdiffusion",
+  "params": {
+    "model_id": "stabilityai/sdxl-turbo",
+    "prompt": "your prompt here",
+    "width": 1024,
+    "height": 576,
+    ...
+  }
+}
+
+→ Response: { "id": "str_abc123", "whip_url": "https://..../whip", ... }
+```
+
+Then send your canvas stream via WebRTC:
+
 ```javascript
 const captureStream = canvas.captureStream(30);
 const pc = new RTCPeerConnection();
@@ -209,6 +272,26 @@ await pc.setRemoteDescription({ type: 'answer', sdp: await response.text() });
 ```
 
 **2. Receive (WHEP)**
+
+Poll the status endpoint to get the `whep_url` (wait for `state: "ONLINE"`):
+
+```javascript
+// Using the project's helper function (src/services/daydreamAPI.js)
+const status = await getStreamStatus(apiKey, streamId);
+const whepUrl = status.data.gateway_status.whep_url;
+```
+
+Internally, `getStreamStatus()` makes this API call:
+
+```
+GET https://api.daydream.live/v1/streams/{STREAM_ID}/status
+Authorization: Bearer {API_KEY}
+
+→ Response: { "data": { "state": "ONLINE", "gateway_status": { "whep_url": "https://..../whep" } } }
+```
+
+Then connect to receive the AI-processed stream:
+
 ```javascript
 import { WebRTCPlayer } from '@eyevinn/webrtc-player';
 
